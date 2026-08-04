@@ -1,0 +1,14 @@
+# Rust
+target/
+server/target/
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Environment
+.env
+.env.local
+
+.vscode/

@@ -1,0 +1,9 @@
+[package]
+name = "risk-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+common = { path = "../common" }

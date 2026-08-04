@@ -1,0 +1,15 @@
+[package]
+name = "market-maker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+rand = "0.8"
+common = { path = "../common" }
+matching-engine = { path = "../matching-engine" }
+graphql-api = { path = "../graphql-api" }

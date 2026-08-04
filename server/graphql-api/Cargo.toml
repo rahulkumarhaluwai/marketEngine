@@ -1,0 +1,25 @@
+[package]
+name = "graphql-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+common = { path = "../common" }
+matching-engine = { path = "../matching-engine" }
+risk-engine = { path = "../risk-engine" }
+async-graphql = "7"
+async-graphql-axum = "7"
+axum = "0.7"
+redis = { version = "0.25", features = ["tokio-comp"] }
+rand = "0.8"
+hex = "0.4"
+argon2 = "0.5"
+anyhow = "1"
+tower-http = { version = "0.5", features = ["cors"] }

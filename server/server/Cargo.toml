@@ -1,0 +1,23 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+rust_decimal = { workspace = true }
+common = { path = "../common" }
+market-data = { path = "../market-data" }
+order-book = { path = "../order-book" }
+matching-engine = { path = "../matching-engine" }
+risk-engine = { path = "../risk-engine" }
+ws-server = { path = "../ws-server" }
+graphql-api = { path = "../graphql-api" }
+postgres-store = { path = "../postgres-store" }
+market-maker = { path = "../market-maker" }
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
