@@ -24,18 +24,18 @@ export default function AlertsPage() {
 
   if (!userId) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white p-8">
-        <p className="text-gray-400">Log in to manage alerts.</p>
+      <main className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-8">
+        <p className="text-gray-500 dark:text-gray-400">Log in to manage alerts.</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8">
+    <main className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-8">
       <h1 className="text-2xl font-semibold mb-6">Price Alerts</h1>
 
       {notice && (
-        <div className="mb-6 rounded-lg border border-yellow-700 bg-yellow-900/30 px-4 py-3 text-yellow-300 text-sm">
+        <div className="mb-6 rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/30 px-4 py-3 text-yellow-700 dark:text-yellow-300 text-sm">
           {notice}
         </div>
       )}
@@ -47,7 +47,7 @@ export default function AlertsPage() {
         </div>
         <div>
           <h2 className="text-lg font-medium mb-4">Your Alerts</h2>
-          {loading ? <p className="text-gray-400">Loading...</p> : <AlertList alerts={alerts} />}
+          {loading ? <p className="text-gray-500 dark:text-gray-400">Loading...</p> : <AlertList alerts={alerts} />}
         </div>
       </div>
     </main>

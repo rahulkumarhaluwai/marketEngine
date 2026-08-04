@@ -128,3 +128,23 @@ export const LOGOUT = gql`
     logout(token: $token)
   }
 `;
+
+export const GET_CANDLES = gql`
+  query GetCandles($symbol: SymbolGql!, $limit: Int!) {
+    candles(symbol: $symbol, limit: $limit) {
+      bucketStart
+      open
+      high
+      low
+      close
+    }
+  }
+`;
+
+export const DEPOSIT = gql`
+  mutation Deposit($userId: ID!, $amount: String!) {
+    deposit(userId: $userId, amount: $amount) {
+      cashBalance
+    }
+  }
+`;

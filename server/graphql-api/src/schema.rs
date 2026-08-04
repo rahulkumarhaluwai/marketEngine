@@ -10,9 +10,11 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::store::CandleSource;
 
-pub struct AppContext {
+    pub struct AppContext {
     pub store: Arc<dyn Store>,
+    pub candles: Arc<dyn CandleSource>,
     pub engines: HashMap<Symbol, EngineHandle>,
     pub risk: RiskEngine,
     pub reference_prices: Arc<tokio::sync::RwLock<HashMap<Symbol, Decimal>>>,
@@ -23,6 +25,11 @@ pub struct AppContext {
 pub enum SymbolGql {
     BtcUsd,
     EthUsd,
+    Aapl,
+    Tsla,
+    Googl,
+    Msft,
+    Amzn,
 }
 
 impl From<SymbolGql> for Symbol {
@@ -30,6 +37,11 @@ impl From<SymbolGql> for Symbol {
         match s {
             SymbolGql::BtcUsd => Symbol::BtcUsd,
             SymbolGql::EthUsd => Symbol::EthUsd,
+            SymbolGql::Aapl => Symbol::Aapl,
+            SymbolGql::Tsla => Symbol::Tsla,
+            SymbolGql::Googl => Symbol::Googl,
+            SymbolGql::Msft => Symbol::Msft,
+            SymbolGql::Amzn => Symbol::Amzn,
         }
     }
 }
@@ -66,6 +78,27 @@ impl From<AlertDirectionGql> for AlertDirection {
         match d {
             AlertDirectionGql::Above => AlertDirection::Above,
             AlertDirectionGql::Below => AlertDirection::Below,
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+pub struct CandleGql {
+    pub bucket_start: String,
+    pub open: String,
+    pub high: String,
+    pub low: String,
+    pub close: String,
+}
+
+impl From<common::types::Candle> for CandleGql {
+    fn from(c: common::types::Candle) -> Self {
+        Self {
+            bucket_start: c.bucket_start.to_rfc3339(),
+            open: c.open.to_string(),
+            high: c.high.to_string(),
+            low: c.low.to_string(),
+            close: c.close.to_string(),
         }
     }
 }
@@ -179,6 +212,11 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    async fn candles(&self, ctx: &Context<'_>, symbol: SymbolGql, limit: i32) -> Result<Vec<CandleGql>> {
+        let app = ctx.data::<AppContext>()?;
+        let symbol: Symbol = symbol.into();
+        Ok(app.candles.get_candles(symbol, limit as i64).await.into_iter().map(Into::into).collect())
+    }
     async fn me(&self, ctx: &Context<'_>, token: String) -> Result<Option<AccountGql>> {
         let app = ctx.data::<AppContext>()?;
         let Some(user_id) = app.sessions.resolve(&token).await? else {

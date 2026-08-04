@@ -66,3 +66,23 @@ CREATE TABLE IF NOT EXISTS market_ticks (
 );
 SELECT create_hypertable('market_ticks', 'ts', if_not_exists => TRUE);
 CREATE INDEX IF NOT EXISTS idx_ticks_symbol_ts ON market_ticks (symbol, ts DESC);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS candles_1m
+WITH (timescaledb.continuous) AS
+SELECT
+    symbol,
+    time_bucket('1 minute', ts) AS bucket,
+    first(price, ts) AS open,
+    max(price)       AS high,
+    min(price)        AS low,
+    last(price, ts)   AS close
+FROM market_ticks
+GROUP BY symbol, bucket
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('candles_1m',
+    start_offset => INTERVAL '1 hour',
+    end_offset => INTERVAL '1 minute',
+    schedule_interval => INTERVAL '1 minute',
+    if_not_exists => TRUE
+);

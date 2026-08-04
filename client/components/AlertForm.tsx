@@ -8,6 +8,11 @@ import { useMarketPrice } from "@/lib/use-market-price";
 const SYMBOLS = [
   { value: "BTC_USD", label: "BTC/USD", wsSymbol: "BTC-USD" },
   { value: "ETH_USD", label: "ETH/USD", wsSymbol: "ETH-USD" },
+  { value: "AAPL", label: "Apple (AAPL)", wsSymbol: "AAPL" },
+  { value: "TSLA", label: "Tesla (TSLA)", wsSymbol: "TSLA" },
+  { value: "GOOGL", label: "Alphabet (GOOGL)", wsSymbol: "GOOGL" },
+  { value: "MSFT", label: "Microsoft (MSFT)", wsSymbol: "MSFT" },
+  { value: "AMZN", label: "Amazon (AMZN)", wsSymbol: "AMZN" },
 ] as const;
 
 export function AlertForm({ onCreated }: { onCreated: () => void }) {
@@ -38,12 +43,12 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm flex flex-col gap-4 text-white">
+    <form onSubmit={handleSubmit} className="max-w-sm flex flex-col gap-4 text-gray-900 dark:text-white">
       <div className="flex justify-between items-center">
         <select
           value={symbolIdx}
           onChange={(e) => setSymbolIdx(Number(e.target.value))}
-          className="bg-gray-800 rounded px-3 py-2"
+          className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 border border-gray-300 dark:border-gray-700"
         >
           {SYMBOLS.map((s, i) => (
             <option key={s.value} value={i}>
@@ -51,7 +56,7 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
             </option>
           ))}
         </select>
-        <span className="font-mono text-gray-400">
+        <span className="font-mono text-gray-500 dark:text-gray-400">
           {liveTick ? `$${Number(liveTick.price).toLocaleString()}` : "—"}
         </span>
       </div>
@@ -60,14 +65,14 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
         <button
           type="button"
           onClick={() => setDirection("ABOVE")}
-          className={`flex-1 py-2 rounded ${direction === "ABOVE" ? "bg-green-600" : "bg-gray-800"}`}
+          className={`flex-1 py-2 rounded ${direction === "ABOVE" ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-gray-800"}`}
         >
           Above
         </button>
         <button
           type="button"
           onClick={() => setDirection("BELOW")}
-          className={`flex-1 py-2 rounded ${direction === "BELOW" ? "bg-red-600" : "bg-gray-800"}`}
+          className={`flex-1 py-2 rounded ${direction === "BELOW" ? "bg-red-600 text-white" : "bg-gray-100 dark:bg-gray-800"}`}
         >
           Below
         </button>
@@ -78,11 +83,11 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
         placeholder="Target price"
         value={targetPrice}
         onChange={(e) => setTargetPrice(e.target.value)}
-        className="bg-gray-800 rounded px-3 py-2"
+        className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 border border-gray-300 dark:border-gray-700"
         required
       />
 
-      <button type="submit" className="bg-indigo-600 rounded py-2 font-medium">
+      <button type="submit" className="bg-indigo-600 text-white rounded py-2 font-medium">
         Create Alert
       </button>
 

@@ -7,6 +7,11 @@ use uuid::Uuid;
 pub enum Symbol {
     BtcUsd,
     EthUsd,
+    Aapl,
+    Tsla,
+    Googl,
+    Msft,
+    Amzn,
 }
 
 impl Symbol {
@@ -14,12 +19,39 @@ impl Symbol {
         match self {
             Symbol::BtcUsd => "BTC-USD",
             Symbol::EthUsd => "ETH-USD",
+            Symbol::Aapl => "AAPL",
+            Symbol::Tsla => "TSLA",
+            Symbol::Googl => "GOOGL",
+            Symbol::Msft => "MSFT",
+            Symbol::Amzn => "AMZN",
         }
     }
 
     pub fn channel(&self) -> String {
         format!("market:{}", self.as_str())
     }
+
+    pub fn all() -> [Symbol; 7] {
+        [
+            Symbol::BtcUsd,
+            Symbol::EthUsd,
+            Symbol::Aapl,
+            Symbol::Tsla,
+            Symbol::Googl,
+            Symbol::Msft,
+            Symbol::Amzn,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Candle {
+    pub symbol: Symbol,
+    pub bucket_start: DateTime<Utc>,
+    pub open: Decimal,
+    pub high: Decimal,
+    pub low: Decimal,
+    pub close: Decimal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

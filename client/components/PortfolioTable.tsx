@@ -3,14 +3,8 @@
 import { useMarketPrice } from "@/lib/use-market-price";
 import { Position } from "@/lib/use-portfolio";
 
-const WS_SYMBOL_MAP: Record<string, string> = {
-  "BTC-USD": "BTC-USD",
-  "ETH-USD": "ETH-USD",
-};
-
 function PositionRow({ position }: { position: Position }) {
-  const wsSymbol = WS_SYMBOL_MAP[position.symbol] ?? position.symbol;
-  const liveTick = useMarketPrice(wsSymbol);
+  const liveTick = useMarketPrice(position.symbol);
 
   const quantity = parseFloat(position.quantity);
   const avgCost = parseFloat(position.avgCost);
@@ -18,10 +12,10 @@ function PositionRow({ position }: { position: Position }) {
   const liveMarketValue = quantity * livePrice;
   const livePnl = liveMarketValue - avgCost * quantity;
 
-  const pnlColor = livePnl >= 0 ? "text-green-500" : "text-red-500";
+  const pnlColor = livePnl >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500";
 
   return (
-    <tr className="border-b border-gray-800">
+    <tr className="border-b border-gray-200 dark:border-gray-800">
       <td className="py-2">{position.symbol}</td>
       <td className="py-2">{quantity.toFixed(6)}</td>
       <td className="py-2">${avgCost.toFixed(2)}</td>
@@ -36,12 +30,12 @@ function PositionRow({ position }: { position: Position }) {
 
 export function PortfolioTable({ positions }: { positions: Position[] }) {
   if (positions.length === 0) {
-    return <p className="text-gray-400">No open positions.</p>;
+    return <p className="text-gray-500 dark:text-gray-400">No open positions.</p>;
   }
 
   return (
-    <table className="w-full text-left text-white">
-      <thead className="text-gray-400 border-b border-gray-700">
+    <table className="w-full text-left text-gray-900 dark:text-white">
+      <thead className="text-gray-500 dark:text-gray-400 border-b border-gray-300 dark:border-gray-700">
         <tr>
           <th className="py-2">Symbol</th>
           <th className="py-2">Qty</th>

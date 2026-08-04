@@ -3,6 +3,7 @@ use common::types::{Order, Symbol, Trade};
 use risk_engine::AccountSnapshot;
 use rust_decimal::Decimal;
 use uuid::Uuid;
+use common::types::Candle;
 
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -55,4 +56,9 @@ pub trait Store: Send + Sync {
     async fn alerts_for_user(&self, user_id: Uuid) -> Vec<Alert>;
     async fn untriggered_alerts_for_symbol(&self, symbol: Symbol) -> Vec<Alert>;
     async fn mark_alert_triggered(&self, alert_id: Uuid);
+}
+
+#[async_trait]
+pub trait CandleSource: Send + Sync {
+    async fn get_candles(&self, symbol: Symbol, limit: i64) -> Vec<Candle>;
 }

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { getStoredUserId, getStoredToken, setStoredSession, clearStoredSession } from "@/lib/session";
 import { gqlClient } from "@/lib/graphql-client";
 import { LOGOUT } from "@/lib/queries";
+import { Theme, getStoredTheme, setStoredTheme, applyTheme } from "@/lib/theme";
 
 type SessionContextValue = {
   userId: string | null;
@@ -12,15 +13,26 @@ type SessionContextValue = {
   clearUserId: () => void;
 };
 
+type ThemeContextValue = {
+  theme: Theme;
+  toggleTheme: () => void;
+};
+
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function Providers({ children }: { children: ReactNode }) {
   const [userId, setUserIdState] = useState<string | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
+  const [theme, setThemeState] = useState<Theme>("dark");
 
   useEffect(() => {
     setUserIdState(getStoredUserId());
     setTokenState(getStoredToken());
+
+    const initialTheme = getStoredTheme();
+    setThemeState(initialTheme);
+    applyTheme(initialTheme);
   }, []);
 
   const setSession = (userId: string, token: string) => {
@@ -38,9 +50,16 @@ export function Providers({ children }: { children: ReactNode }) {
     setTokenState(null);
   };
 
+  const toggleTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setThemeState(next);
+    setStoredTheme(next);
+    applyTheme(next);
+  };
+
   return (
     <SessionContext.Provider value={{ userId, token, setSession, clearUserId }}>
-      {children}
+      <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
     </SessionContext.Provider>
   );
 }
@@ -48,5 +67,11 @@ export function Providers({ children }: { children: ReactNode }) {
 export function useSession() {
   const ctx = useContext(SessionContext);
   if (!ctx) throw new Error("useSession must be used within Providers");
+  return ctx;
+}
+
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error("useTheme must be used within Providers");
   return ctx;
 }

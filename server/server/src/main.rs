@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::signal;
 use ws_server::AlertFeed;
 use graphql_api::store::Store;
+use graphql_api::store::CandleSource;
 
 #[tokio::main]
 async fn main() {
@@ -48,11 +49,22 @@ async fn main() {
         let price_cache = price_cache.clone();
         let reference_prices = reference_prices.clone();
         tokio::spawn(async move {
-            while let Ok(tick) = rx.recv().await {
-                reference_prices.write().await.insert(tick.symbol, tick.price);
-                let _ = price_cache.set_price(tick.symbol, tick.price).await;
-                if let Err(e) = store.record_tick(tick.symbol, tick.price, tick.timestamp).await {
-                    tracing::warn!("failed to persist tick: {e}");
+            loop {
+                match rx.recv().await {
+                    Ok(tick) => {
+                        reference_prices.write().await.insert(tick.symbol, tick.price);
+                        let _ = price_cache.set_price(tick.symbol, tick.price).await;
+                        if let Err(e) = store.record_tick(tick.symbol, tick.price, tick.timestamp).await {
+                            tracing::warn!("failed to persist tick: {e}");
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("tick writer lagged, dropped {n} ticks — DB writes falling behind");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::error!("market feed closed, tick writer stopping");
+                        break;
+                    }
                 }
             }
         })
@@ -63,7 +75,19 @@ async fn main() {
         let store = store.clone();
         let alert_feed = alert_feed.clone();
         tokio::spawn(async move {
-            while let Ok(tick) = rx.recv().await {
+            loop {
+                let tick = match rx.recv().await {
+                    Ok(tick) => tick,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("alert checker lagged, dropped {n} ticks");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::error!("market feed closed, alert checker stopping");
+                        break;
+                    }
+                };
+
                 let candidates = store.untriggered_alerts_for_symbol(tick.symbol).await;
 
                 for alert in candidates {
@@ -94,7 +118,7 @@ async fn main() {
         })
     };
 
-    for symbol in [Symbol::BtcUsd, Symbol::EthUsd] {
+    for symbol in Symbol::all(){
         if let Some(engine) = engines.get(&symbol) {
             market_maker::spawn(
                 symbol,
@@ -122,8 +146,10 @@ async fn main() {
         let store = store.clone();
         tokio::spawn(async move {
             tracing::info!("graphql api starting");
+            let candles: Arc<dyn CandleSource> = store.clone();
             let context = AppContext {
                 store,
+                candles,
                 engines,
                 risk: RiskEngine::new(RiskConfig::default()),
                 reference_prices,

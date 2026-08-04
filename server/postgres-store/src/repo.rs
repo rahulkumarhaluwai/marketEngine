@@ -7,6 +7,8 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use uuid::Uuid;
+use common::types::Candle;
+use graphql_api::store::CandleSource;
 
 pub struct PostgresStore {
     pool: PgPool,
@@ -14,9 +16,12 @@ pub struct PostgresStore {
 
 impl PostgresStore {
     pub async fn connect(database_url: &str) -> anyhow::Result<Self> {
-        let pool = PgPool::connect(database_url).await?;
-        Ok(Self { pool })
-    }
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(20)
+        .connect(database_url)
+        .await?;
+    Ok(Self { pool })
+}
 
     pub async fn record_tick(&self, symbol: Symbol, price: Decimal, ts: chrono::DateTime<Utc>) -> anyhow::Result<()> {
         sqlx::query("INSERT INTO market_ticks (symbol, ts, price) VALUES ($1, $2, $3)")
@@ -422,5 +427,37 @@ impl Store for PostgresStore {
                 }
             })
             .collect()
+    }
+}
+
+#[async_trait]
+impl CandleSource for PostgresStore {
+    async fn get_candles(&self, symbol: Symbol, limit: i64) -> Vec<Candle> {
+        let Ok(rows) = sqlx::query(
+            "SELECT bucket, open, high, low, close FROM candles_1m
+             WHERE symbol = $1 ORDER BY bucket DESC LIMIT $2",
+        )
+        .bind(symbol.as_str())
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        else {
+            return vec![];
+        };
+
+        let mut candles: Vec<Candle> = rows
+            .into_iter()
+            .map(|row| Candle {
+                symbol,
+                bucket_start: row.get("bucket"),
+                open: row.get("open"),
+                high: row.get("high"),
+                low: row.get("low"),
+                close: row.get("close"),
+            })
+            .collect();
+
+        candles.reverse(); // chronological order for charting
+        candles
     }
 }

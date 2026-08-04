@@ -6,8 +6,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::broadcast;
 
-pub const SYMBOLS: [Symbol; 2] = [Symbol::BtcUsd, Symbol::EthUsd];
-
 #[derive(Clone)]
 pub struct MarketDataFeed {
     sender: broadcast::Sender<Tick>,
@@ -28,13 +26,18 @@ fn starting_price(symbol: Symbol) -> Decimal {
     match symbol {
         Symbol::BtcUsd => Decimal::from_str("105230.00").unwrap(),
         Symbol::EthUsd => Decimal::from_str("3450.00").unwrap(),
+        Symbol::Aapl => Decimal::from_str("227.50").unwrap(),
+        Symbol::Tsla => Decimal::from_str("245.80").unwrap(),
+        Symbol::Googl => Decimal::from_str("178.20").unwrap(),
+        Symbol::Msft => Decimal::from_str("430.10").unwrap(),
+        Symbol::Amzn => Decimal::from_str("195.40").unwrap(),
     }
 }
 
 pub async fn run(feed: MarketDataFeed) {
     let mut handles = Vec::new();
 
-    for symbol in SYMBOLS {
+    for symbol in Symbol::all() {
         let feed = feed.clone();
         let handle = tokio::spawn(async move {
             let mut price = starting_price(symbol);
@@ -50,9 +53,12 @@ pub async fn run(feed: MarketDataFeed) {
                     (direction, magnitude)
                 };
 
-                let step = Decimal::from_str("0.01").unwrap()
-                    * Decimal::from(direction)
-                    * Decimal::from(magnitude);
+                let tick_size = match symbol {
+                    Symbol::BtcUsd | Symbol::EthUsd => Decimal::from_str("0.01").unwrap(),
+                    _ => Decimal::from_str("0.005").unwrap(), // smaller steps for stocks
+                };
+
+                let step = tick_size * Decimal::from(direction) * Decimal::from(magnitude);
                 price += step;
                 if price <= Decimal::ZERO {
                     price = starting_price(symbol);
