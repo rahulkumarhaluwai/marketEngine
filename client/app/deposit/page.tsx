@@ -1,34 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "@/app/providers";
 import { gqlClient } from "@/lib/graphql-client";
-import { DEPOSIT } from "@/lib/queries";
+import { CREATE_CHECKOUT_SESSION } from "@/lib/queries";
 
-const QUICK_AMOUNTS = ["1000", "5000", "10000", "50000"];
+const PACKS = [
+  { id: "starter", label: "Starter Pack", price: "$1.00", credits: "10,000" },
+  { id: "trader", label: "Trader Pack", price: "$5.00", credits: "60,000" },
+  { id: "pro", label: "Pro Pack", price: "$10.00", credits: "150,000" },
+];
 
 export default function DepositPage() {
   const { userId } = useSession();
-  const [amount, setAmount] = useState("");
-  const [balance, setBalance] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleDeposit(value: string) {
+  const success = searchParams.get("success") === "true";
+  const canceled = searchParams.get("canceled") === "true";
+
+  async function handlePurchase(packId: string) {
     if (!userId) return;
-    setLoading(true);
+    setLoadingPack(packId);
     setError(null);
     try {
-      const data = await gqlClient.request<{ deposit: { cashBalance: string } }>(DEPOSIT, {
+      const data = await gqlClient.request<{ createCheckoutSession: { url: string } }>(CREATE_CHECKOUT_SESSION, {
         userId,
-        amount: value,
+        packId,
       });
-      setBalance(data.deposit.cashBalance);
-      setAmount("");
+      window.location.href = data.createCheckoutSession.url;
     } catch (err: any) {
-      setError(err?.response?.errors?.[0]?.message ?? "Deposit failed");
-    } finally {
-      setLoading(false);
+      setError(err?.response?.errors?.[0]?.message ?? "Could not start checkout");
+      setLoadingPack(null);
     }
   }
 
@@ -42,46 +47,41 @@ export default function DepositPage() {
 
   return (
     <main className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-8">
-      <h1 className="text-2xl font-semibold mb-6">Deposit Virtual Funds</h1>
+      <h1 className="text-2xl font-semibold mb-2">Buy Virtual Credits</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        Stripe test mode — no real charges. Use test card 4242 4242 4242 4242, any future date, any CVC.
+      </p>
 
-      <div className="max-w-sm flex flex-col gap-4">
-        {balance && (
-          <div className="rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950 px-4 py-3 text-green-700 dark:text-green-400 text-sm">
-            Deposited successfully. New balance: ${Number(balance).toLocaleString()}
-          </div>
-        )}
+      {success && (
+        <div className="mb-6 rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950 px-4 py-3 text-green-700 dark:text-green-400 text-sm">
+          Payment received. Your balance will update within a few seconds — check{" "}
+          <a href="/portfolio" className="underline">Portfolio</a>.
+        </div>
+      )}
+      {canceled && (
+        <div className="mb-6 rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/30 px-4 py-3 text-yellow-700 dark:text-yellow-300 text-sm">
+          Checkout canceled.
+        </div>
+      )}
+      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        <div className="grid grid-cols-2 gap-2">
-          {QUICK_AMOUNTS.map((amt) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
+        {PACKS.map((pack) => (
+          <div key={pack.id} className="rounded-lg border border-gray-300 dark:border-gray-700 p-5 flex flex-col gap-3">
+            <div>
+              <div className="font-medium">{pack.label}</div>
+              <div className="text-2xl font-mono mt-1">{pack.price}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{pack.credits} virtual credits</div>
+            </div>
             <button
-              key={amt}
-              onClick={() => handleDeposit(amt)}
-              disabled={loading}
-              className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+              onClick={() => handlePurchase(pack.id)}
+              disabled={loadingPack !== null}
+              className="bg-indigo-600 text-white rounded py-2 font-medium disabled:opacity-50"
             >
-              +${Number(amt).toLocaleString()}
+              {loadingPack === pack.id ? "Redirecting..." : "Buy"}
             </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Custom amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="flex-1 bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 border border-gray-300 dark:border-gray-700"
-          />
-          <button
-            onClick={() => amount && handleDeposit(amount)}
-            disabled={loading || !amount}
-            className="bg-indigo-600 text-white rounded px-4 py-2 font-medium disabled:opacity-50"
-          >
-            {loading ? "..." : "Deposit"}
-          </button>
-        </div>
-
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+          </div>
+        ))}
       </div>
     </main>
   );

@@ -34,7 +34,7 @@ export default function LoginPage() {
       const result = data.login ?? data.register;
       if (!result) throw new Error("no session returned");
 
-      setSession(result.account.id, result.token);
+      setSession(result.account.id, result.token, result.account.username);
       router.push("/");
     } catch (err: any) {
       setError(err?.response?.errors?.[0]?.message ?? "Authentication failed");

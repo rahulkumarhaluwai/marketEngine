@@ -99,6 +99,13 @@ impl Store for PostgresStore {
         account
     }
 
+    async fn all_user_ids(&self) -> Vec<Uuid> {
+        let Ok(rows) = sqlx::query("SELECT user_id FROM accounts").fetch_all(&self.pool).await else {
+            return vec![];
+        };
+        rows.into_iter().map(|row| row.get("user_id")).collect()
+    }
+
     async fn get_account(&self, user_id: Uuid) -> Option<Account> {
         let row = sqlx::query(
             "SELECT user_id, username, cash_balance, password_hash FROM accounts WHERE user_id = $1",

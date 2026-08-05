@@ -4,16 +4,7 @@ import { useState } from "react";
 import { useSession } from "@/app/providers";
 import { useAlerts } from "@/lib/use-alerts";
 import { useMarketPrice } from "@/lib/use-market-price";
-
-const SYMBOLS = [
-  { value: "BTC_USD", label: "BTC/USD", wsSymbol: "BTC-USD" },
-  { value: "ETH_USD", label: "ETH/USD", wsSymbol: "ETH-USD" },
-  { value: "AAPL", label: "Apple (AAPL)", wsSymbol: "AAPL" },
-  { value: "TSLA", label: "Tesla (TSLA)", wsSymbol: "TSLA" },
-  { value: "GOOGL", label: "Alphabet (GOOGL)", wsSymbol: "GOOGL" },
-  { value: "MSFT", label: "Microsoft (MSFT)", wsSymbol: "MSFT" },
-  { value: "AMZN", label: "Amazon (AMZN)", wsSymbol: "AMZN" },
-] as const;
+import { ASSETS } from "@/lib/assets";
 
 export function AlertForm({ onCreated }: { onCreated: () => void }) {
   const { userId } = useSession();
@@ -22,7 +13,7 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
   const [direction, setDirection] = useState<"ABOVE" | "BELOW">("ABOVE");
   const { createAlert, error } = useAlerts(userId);
 
-  const symbol = SYMBOLS[symbolIdx];
+  const symbol = ASSETS[symbolIdx];
   const liveTick = useMarketPrice(symbol.wsSymbol);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -31,7 +22,7 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
 
     const created = await createAlert({
       userId,
-      symbol: symbol.value,
+      symbol: symbol.gqlValue,
       targetPrice,
       direction,
     });
@@ -50,8 +41,8 @@ export function AlertForm({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setSymbolIdx(Number(e.target.value))}
           className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-2 border border-gray-300 dark:border-gray-700"
         >
-          {SYMBOLS.map((s, i) => (
-            <option key={s.value} value={i}>
+          {ASSETS.map((s, i) => (
+            <option key={s.gqlValue} value={i}>
               {s.label}
             </option>
           ))}

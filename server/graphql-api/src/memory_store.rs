@@ -44,6 +44,10 @@ impl Store for InMemoryStore {
         self.inner.lock().unwrap().accounts.values().find(|a| a.username == username).cloned()
     }
 
+    async fn all_user_ids(&self) -> Vec<Uuid> {
+        self.inner.lock().unwrap().accounts.keys().copied().collect()
+    }
+
     async fn deposit(&self, user_id: Uuid, amount: Decimal) -> Option<Account> {
         let mut inner = self.inner.lock().unwrap();
         let account = inner.accounts.get_mut(&user_id)?;

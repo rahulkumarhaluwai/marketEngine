@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { gqlClient } from "./graphql-client";
 import { GET_CANDLES } from "./queries";
+import { assetByWsSymbol } from "./assets";
 
 export type Candle = {
   bucketStart: string;
@@ -30,7 +31,7 @@ export function useCandles(wsSymbol: string, limit: number = 100) {
     let cancelled = false;
     setLoading(true);
 
-    const symbolGql = SYMBOL_GQL_MAP[wsSymbol] ?? wsSymbol;
+    const symbolGql = assetByWsSymbol(wsSymbol)?.gqlValue ?? wsSymbol;
 
     gqlClient
       .request<{ candles: Candle[] }>(GET_CANDLES, { symbol: symbolGql, limit })

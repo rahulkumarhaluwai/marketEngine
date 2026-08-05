@@ -9,16 +9,23 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use billing;
 use uuid::Uuid;
 use crate::store::CandleSource;
+use crate::leaderboard::Leaderboard;
+use crate::rate_limiter::RateLimiter;
 
     pub struct AppContext {
     pub store: Arc<dyn Store>,
     pub candles: Arc<dyn CandleSource>,
+    pub stripe_secret_key: String,
+    pub app_base_url: String,
     pub engines: HashMap<Symbol, EngineHandle>,
     pub risk: RiskEngine,
     pub reference_prices: Arc<tokio::sync::RwLock<HashMap<Symbol, Decimal>>>,
     pub sessions: SessionStore,
+    pub leaderboard: Leaderboard,
+    pub rate_limiter: RateLimiter,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -59,6 +66,13 @@ impl From<SideGql> for Side {
             SideGql::Sell => Side::Sell,
         }
     }
+}
+
+#[derive(SimpleObject)]
+pub struct LeaderboardEntryGql {
+    pub rank: i32,
+    pub username: String,
+    pub equity: String,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -114,6 +128,10 @@ impl From<Account> for AccountGql {
     fn from(a: Account) -> Self {
         Self { id: ID(a.id.to_string()), username: a.username, cash_balance: a.cash_balance.to_string() }
     }
+}
+#[derive(SimpleObject)]
+pub struct CheckoutSessionGql {
+    pub url: String,
 }
 
 #[derive(SimpleObject)]
@@ -225,6 +243,24 @@ impl QueryRoot {
         Ok(app.store.get_account(user_id).await.map(Into::into))
     }
 
+    async fn leaderboard(&self, ctx: &Context<'_>, limit: i32) -> Result<Vec<LeaderboardEntryGql>> {
+        let app = ctx.data::<AppContext>()?;
+        let top = app.leaderboard.top(limit as isize).await?;
+
+        let mut entries = Vec::new();
+        for (rank, (user_id, equity)) in top.into_iter().enumerate() {
+            if let Some(account) = app.store.get_account(user_id).await {
+                entries.push(LeaderboardEntryGql {
+                    rank: (rank + 1) as i32,
+                    username: account.username,
+                    equity: format!("{:.2}", equity),
+                });
+            }
+        }
+
+        Ok(entries)
+    }
+
     async fn account(&self, ctx: &Context<'_>, user_id: ID) -> Result<Option<AccountGql>> {
         let app = ctx.data::<AppContext>()?;
         let id = Uuid::from_str(&user_id)?;
@@ -309,8 +345,31 @@ impl MutationRoot {
         Ok(SessionGql { token, account: account.into() })
     }
 
+    async fn create_checkout_session(&self, ctx: &Context<'_>, user_id: ID, pack_id: String) -> Result<CheckoutSessionGql> {
+        let app = ctx.data::<AppContext>()?;
+        let pack = billing::CREDIT_PACKS.iter().find(|p| p.id == pack_id).ok_or("invalid pack")?;
+        let user_id = Uuid::from_str(&user_id)?;
+
+        let success_url = format!("{}/deposit?success=true", app.app_base_url);
+        let cancel_url = format!("{}/deposit?canceled=true", app.app_base_url);
+
+        let url = billing::create_checkout_session(&app.stripe_secret_key, pack, user_id, &success_url, &cancel_url)
+            .await
+            .map_err(|e| format!("stripe error: {e}"))?;
+
+        Ok(CheckoutSessionGql { url })
+    }
+
     async fn login(&self, ctx: &Context<'_>, username: String, password: String) -> Result<SessionGql> {
         let app = ctx.data::<AppContext>()?;
+
+        let allowed = app
+            .rate_limiter
+            .check_and_increment(&format!("ratelimit:login:{username}"), 5, 60)
+            .await?;
+        if !allowed {
+            return Err("too many login attempts, please try again in a minute".into());
+        }
 
         let account = app.store.get_account_by_username(&username).await.ok_or("invalid username or password")?;
 
@@ -350,6 +409,15 @@ impl MutationRoot {
         price: Option<String>,
     ) -> Result<OrderGql> {
         let app = ctx.data::<AppContext>()?;
+
+        let allowed = app
+            .rate_limiter
+            .check_and_increment(&format!("ratelimit:orders:{}", user_id.as_str()), 20, 60)
+            .await?;
+        if !allowed {
+            return Err("order rate limit exceeded — max 20 orders per minute".into());
+        }
+
         let user_id = Uuid::from_str(&user_id)?;
         let symbol: Symbol = symbol.into();
         let side: Side = side.into();

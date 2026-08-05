@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { PriceTicker } from "@/components/PriceTicker";
 import { CandlestickChart } from "@/components/CandlestickChart";
-
-const ASSETS = [
-  { symbol: "BTC-USD", label: "BTC/USD", category: "Crypto" },
-  { symbol: "ETH-USD", label: "ETH/USD", category: "Crypto" },
-  { symbol: "AAPL", label: "Apple", category: "Stocks" },
-  { symbol: "TSLA", label: "Tesla", category: "Stocks" },
-  { symbol: "GOOGL", label: "Alphabet", category: "Stocks" },
-  { symbol: "MSFT", label: "Microsoft", category: "Stocks" },
-  { symbol: "AMZN", label: "Amazon", category: "Stocks" },
-];
+import { ASSETS } from "@/lib/assets";
 
 export default function DashboardPage() {
   const [selected, setSelected] = useState("BTC-USD");
@@ -25,10 +16,10 @@ export default function DashboardPage() {
         <div className="lg:col-span-1 flex flex-col gap-2">
           {ASSETS.map((asset) => (
             <button
-              key={asset.symbol}
-              onClick={() => setSelected(asset.symbol)}
+              key={asset.wsSymbol}
+              onClick={() => setSelected(asset.wsSymbol)}
               className={`text-left rounded-lg border px-4 py-3 transition-colors ${
-                selected === asset.symbol
+                selected === asset.wsSymbol
                   ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
                   : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
               }`}
@@ -38,7 +29,7 @@ export default function DashboardPage() {
                   <div className="font-medium">{asset.label}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">{asset.category}</div>
                 </div>
-                <PriceTicker symbol={asset.symbol} label="" compact />
+                <PriceTicker symbol={asset.wsSymbol} label="" compact />
               </div>
             </button>
           ))}

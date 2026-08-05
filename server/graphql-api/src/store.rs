@@ -35,7 +35,7 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, user_id: Uuid) -> Option<Account>;
     async fn get_account_by_username(&self, username: &str) -> Option<Account>;
     async fn deposit(&self, user_id: Uuid, amount: Decimal) -> Option<Account>;
-
+    async fn all_user_ids(&self) -> Vec<Uuid>;
     async fn account_snapshot(&self, user_id: Uuid) -> Option<AccountSnapshot>;
     async fn holdings(&self, user_id: Uuid) -> Vec<(Symbol, Decimal)>;
 

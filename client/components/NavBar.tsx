@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/app/providers";
 import { ThemeToggle } from "./ThemeToggle";
+import { Avatar } from "./Avatar";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -12,11 +13,12 @@ const LINKS = [
   { href: "/history", label: "History" },
   { href: "/alerts", label: "Alerts" },
   { href: "/deposit", label: "Deposit" },
+  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 export function NavBar() {
   const pathname = usePathname();
-  const { userId, clearUserId } = useSession();
+  const { userId, username, clearUserId } = useSession();
 
   return (
     <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -44,9 +46,10 @@ export function NavBar() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          {userId ? (
+          {userId && username ? (
             <>
-              <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{userId.slice(0, 8)}</span>
+              <Avatar username={username} size="sm" />
+              <span className="text-sm text-gray-600 dark:text-gray-300">{username}</span>
               <button onClick={clearUserId} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                 Log out
               </button>

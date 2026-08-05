@@ -13,9 +13,16 @@ use tokio::signal;
 use ws_server::AlertFeed;
 use graphql_api::store::Store;
 use graphql_api::store::CandleSource;
+use graphql_api::leaderboard::Leaderboard;
+use graphql_api::rate_limiter::RateLimiter;
+use std::str::FromStr as _;
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+let stripe_secret_key = std::env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY not set");
+let stripe_webhook_secret = std::env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET not set");
+let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     tracing_subscriber::fmt::init();
     tracing::info!("starting trading platform backend");
 
@@ -30,6 +37,8 @@ async fn main() {
     );
     let price_cache = PriceCache::new("redis://127.0.0.1/").expect("connect to Redis (price cache)");
     let sessions = SessionStore::new("redis://127.0.0.1/").expect("connect to Redis (sessions)");
+    let leaderboard = Leaderboard::new("redis://127.0.0.1/").expect("connect to Redis (leaderboard)");
+    let rate_limiter = RateLimiter::new("redis://127.0.0.1/").expect("connect to Redis (rate limiter)");
 
     let mut engines: HashMap<Symbol, EngineHandle> = HashMap::new();
     engines.insert(Symbol::BtcUsd, matching_engine::spawn(Symbol::BtcUsd));
@@ -118,6 +127,37 @@ async fn main() {
         })
     };
 
+    let leaderboard_refresh_task = {
+        let store = store.clone();
+        let leaderboard = leaderboard.clone();
+        let reference_prices = reference_prices.clone();
+        tokio::spawn(async move {
+            loop {
+                let user_ids = store.all_user_ids().await;
+                let prices = reference_prices.read().await.clone();
+
+                for user_id in user_ids {
+                    let Some(account) = store.get_account(user_id).await else { continue };
+                    if account.username.starts_with("bot_maker_") {
+                        continue;
+                    }
+                    let holdings = store.holdings(user_id).await;
+
+                    let mut equity = account.cash_balance;
+                    for (symbol, qty) in holdings {
+                        let price = prices.get(&symbol).copied().unwrap_or(Decimal::ZERO);
+                        equity += price * qty;
+                    }
+
+                    let equity_f64: f64 = equity.to_string().parse().unwrap_or(0.0);
+                    let _ = leaderboard.set_equity(user_id, equity_f64).await;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        })
+    };
+
     for symbol in Symbol::all(){
         if let Some(engine) = engines.get(&symbol) {
             market_maker::spawn(
@@ -144,9 +184,11 @@ async fn main() {
         let engines = engines.clone();
         let reference_prices = reference_prices.clone();
         let store = store.clone();
+        let stripe_webhook_secret = stripe_webhook_secret.clone();
         tokio::spawn(async move {
             tracing::info!("graphql api starting");
             let candles: Arc<dyn CandleSource> = store.clone();
+            let webhook_store = store.clone();
             let context = AppContext {
                 store,
                 candles,
@@ -154,10 +196,14 @@ async fn main() {
                 risk: RiskEngine::new(RiskConfig::default()),
                 reference_prices,
                 sessions,
+                leaderboard,
+                rate_limiter,
+                stripe_secret_key: stripe_secret_key.clone(),
+                app_base_url: app_base_url.clone(),
             };
             let schema = graphql_api::build_schema(context);
             let addr: SocketAddr = "0.0.0.0:8000".parse().unwrap();
-            graphql_api::run(addr, schema).await;
+            graphql_api::run(addr, schema, webhook_store, stripe_webhook_secret).await;
         })
     };
 
@@ -168,5 +214,6 @@ async fn main() {
         _ = ws_server_task => tracing::error!("ws server task exited"),
         _ = graphql_task => tracing::error!("graphql task exited"),
         _ = signal::ctrl_c() => tracing::info!("shutdown signal received"),
+        _ = leaderboard_refresh_task => tracing::error!("leaderboard refresh task exited"),
     }
 }

@@ -1,5 +1,8 @@
 pub mod auth;
+pub mod billing_routes;
+pub mod leaderboard;
 pub mod memory_store;
+pub mod rate_limiter;
 pub mod schema;
 pub mod session_store;
 pub mod store;
@@ -17,14 +20,12 @@ pub fn build_schema(context: AppContext) -> AppSchema {
         .finish()
 }
 
-pub async fn run(addr: SocketAddr, schema: AppSchema) {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+pub async fn run(addr: SocketAddr, schema: AppSchema, store: std::sync::Arc<dyn store::Store>, stripe_webhook_secret: String) {
+    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
 
     let app = Router::new()
         .route("/graphql", get(graphiql).post_service(GraphQL::new(schema)))
+        .merge(billing_routes::billing_router(store, stripe_webhook_secret))
         .layer(cors);
 
     tracing::info!("graphql api listening on {addr}");

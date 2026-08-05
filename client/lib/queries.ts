@@ -148,3 +148,21 @@ export const DEPOSIT = gql`
     }
   }
 `;
+
+export const GET_LEADERBOARD = gql`
+  query GetLeaderboard($limit: Int!) {
+    leaderboard(limit: $limit) {
+      rank
+      username
+      equity
+    }
+  }
+`;
+
+export const CREATE_CHECKOUT_SESSION = gql`
+  mutation CreateCheckoutSession($userId: ID!, $packId: String!) {
+    createCheckoutSession(userId: $userId, packId: $packId) {
+      url
+    }
+  }
+`;
