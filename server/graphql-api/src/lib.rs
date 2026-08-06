@@ -20,21 +20,28 @@ pub fn build_schema(context: AppContext) -> AppSchema {
         .finish()
 }
 
-pub async fn run(addr: SocketAddr, schema: AppSchema, store: std::sync::Arc<dyn store::Store>, stripe_webhook_secret: String) {
+pub async fn run(
+    addr: SocketAddr,
+    schema: AppSchema,
+    store: std::sync::Arc<dyn store::Store>,
+    stripe_webhook_secret: String,
+    ws_routes: Router,
+) {
     let frontend_origin = std::env::var("FRONTEND_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let cors = CorsLayer::new()
-    .allow_origin(frontend_origin.parse::<axum::http::HeaderValue>().expect("invalid FRONTEND_ORIGIN"))
-    .allow_methods(Any)
-    .allow_headers(Any);
+        .allow_origin(frontend_origin.parse::<axum::http::HeaderValue>().expect("invalid FRONTEND_ORIGIN"))
+        .allow_methods(Any)
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/graphql", get(graphiql).post_service(GraphQL::new(schema)))
         .merge(billing_routes::billing_router(store, stripe_webhook_secret))
+        .merge(ws_routes)
         .layer(cors);
 
-    tracing::info!("graphql api listening on {addr}");
-    let listener = tokio::net::TcpListener::bind(addr).await.expect("bind graphql server");
-    axum::serve(listener, app).await.expect("graphql server error");
+    tracing::info!("server listening on {addr}");
+    let listener = tokio::net::TcpListener::bind(addr).await.expect("bind server");
+    axum::serve(listener, app).await.expect("server error");
 }
 
 async fn graphiql() -> axum::response::Html<String> {

@@ -1,18 +1,53 @@
-use common::types::{Symbol, Tick};
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::Router;
+use common::types::{AlertTriggeredEvent, Symbol, Tick};
 use futures::{SinkExt, StreamExt};
-use market_data::MarketDataFeed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
-use tokio_tungstenite::tungstenite::Message;
-use common::types::AlertTriggeredEvent;
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ClientMessage {
     Subscribe { channel: String },
     Unsubscribe { channel: String },
+}
+
+#[derive(Debug, Serialize)]
+struct TickMessage {
+    channel: String,
+    symbol: &'static str,
+    price: String,
+    timestamp: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AlertMessage {
+    channel: String,
+    alert_id: String,
+    symbol: &'static str,
+    target_price: String,
+    price_at_trigger: String,
+    direction: String,
+}
+
+fn channel_for(symbol: Symbol) -> String {
+    symbol.channel()
+}
+
+fn alert_channel_for(user_id: Uuid) -> String {
+    format!("alerts:{}", user_id)
+}
+
+fn to_client_message(tick: &Tick) -> TickMessage {
+    TickMessage {
+        channel: channel_for(tick.symbol),
+        symbol: tick.symbol.as_str(),
+        price: tick.price.to_string(),
+        timestamp: tick.timestamp.to_rfc3339(),
+    }
 }
 
 #[derive(Clone)]
@@ -35,77 +70,32 @@ impl AlertFeed {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct AlertMessage {
-    channel: String,
-    alert_id: String,
-    symbol: &'static str,
-    target_price: String,
-    price_at_trigger: String,
-    direction: String,
-}
-
-fn alert_channel_for(user_id: uuid::Uuid) -> String {
-    format!("alerts:{}", user_id)
-}
-
-#[derive(Debug, Serialize)]
-struct TickMessage {
-    channel: String,
-    symbol: &'static str,
-    price: String,
-    timestamp: String,
-}
-
-fn channel_for(symbol: Symbol) -> String {
-    symbol.channel()
-}
-
-fn to_client_message(tick: &Tick) -> TickMessage {
-    TickMessage {
-        channel: channel_for(tick.symbol),
-        symbol: tick.symbol.as_str(),
-        price: tick.price.to_string(),
-        timestamp: tick.timestamp.to_rfc3339(),
-    }
-}
-
-pub async fn run(addr: SocketAddr, feed: MarketDataFeed, alert_feed: AlertFeed) {
-    let listener = TcpListener::bind(addr).await.expect("bind ws server");
-    tracing::info!("ws server listening on {addr}");
-
-    loop {
-        let (stream, peer) = match listener.accept().await {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::warn!("accept error: {e}");
-                continue;
-            }
-        };
-        let feed = feed.clone();
-        let alert_feed = alert_feed.clone();
-        tokio::spawn(async move {
-            if let Err(e) = handle_connection(stream, peer, feed, alert_feed).await {
-                tracing::warn!("connection {peer} closed: {e}");
-            }
-        });
-    }
-}
-
-async fn handle_connection(
-    stream: TcpStream,
-    peer: SocketAddr,
-    feed: MarketDataFeed,
+#[derive(Clone)]
+struct WsState {
+    feed: market_data::MarketDataFeed,
     alert_feed: AlertFeed,
-) -> anyhow::Result<()> {
-    let ws_stream = tokio_tungstenite::accept_async(stream).await?;
-    let (mut write, mut read) = ws_stream.split();
+}
 
+/// Builds a `/ws` route that can be `.merge()`d into an existing Axum
+/// Router — shares the same port as GraphQL/HTTP.
+pub fn ws_router(feed: market_data::MarketDataFeed, alert_feed: AlertFeed) -> Router {
+    Router::new()
+        .route("/ws", get(ws_handler))
+        .with_state(WsState { feed, alert_feed })
+}
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    axum::extract::State(state): axum::extract::State<WsState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, state.feed, state.alert_feed))
+}
+
+async fn handle_socket(socket: WebSocket, feed: market_data::MarketDataFeed, alert_feed: AlertFeed) {
+    let (mut write, mut read) = socket.split();
     let mut subscriptions: HashSet<String> = HashSet::new();
     let mut tick_rx = feed.subscribe();
     let mut alert_rx = alert_feed.subscribe();
-
-    tracing::info!("client connected: {peer}");
 
     loop {
         tokio::select! {
@@ -120,7 +110,10 @@ async fn handle_connection(
                         }
                     }
                     Some(Ok(Message::Close(_))) | None => break,
-                    Some(Err(e)) => { tracing::warn!("read error from {peer}: {e}"); break; }
+                    Some(Err(e)) => {
+                        tracing::warn!("ws read error: {e}");
+                        break;
+                    }
                     _ => {}
                 }
             }
@@ -131,11 +124,15 @@ async fn handle_connection(
                         let channel = channel_for(tick.symbol);
                         if subscriptions.contains(&channel) {
                             let payload = to_client_message(&tick);
-                            write.send(Message::Text(serde_json::to_string(&payload)?)).await?;
+                            if let Ok(json) = serde_json::to_string(&payload) {
+                                if write.send(Message::Text(json)).await.is_err() {
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("client {peer} lagged, skipped {n} ticks");
+                        tracing::warn!("ws client lagged, skipped {n} ticks");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
@@ -154,7 +151,11 @@ async fn handle_connection(
                                 price_at_trigger: event.price_at_trigger.to_string(),
                                 direction: format!("{:?}", event.direction),
                             };
-                            write.send(Message::Text(serde_json::to_string(&payload)?)).await?;
+                            if let Ok(json) = serde_json::to_string(&payload) {
+                                if write.send(Message::Text(json)).await.is_err() {
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
@@ -163,7 +164,4 @@ async fn handle_connection(
             }
         }
     }
-
-    tracing::info!("client disconnected: {peer}");
-    Ok(())
 }

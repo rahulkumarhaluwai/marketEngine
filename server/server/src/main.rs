@@ -172,22 +172,12 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
         }
     }
 
-    let ws_server_task = {
-        let feed = market_feed.clone();
-        let alert_feed = alert_feed.clone();
-        tokio::spawn(async move {
-            tracing::info!("websocket server starting");
-            let ws_port = std::env::var("WS_PORT").unwrap_or_else(|_| "9001".to_string());
-            let addr: SocketAddr = format!("0.0.0.0:{ws_port}").parse().unwrap();
-            ws_server::run(addr, feed, alert_feed).await;
-        })
-    };
-
     let graphql_task = {
         let engines = engines.clone();
         let reference_prices = reference_prices.clone();
         let store = store.clone();
         let stripe_webhook_secret = stripe_webhook_secret.clone();
+        let feed_for_ws = market_feed.clone();
         tokio::spawn(async move {
             tracing::info!("graphql api starting");
             let candles: Arc<dyn CandleSource> = store.clone();
@@ -207,7 +197,8 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
             let schema = graphql_api::build_schema(context);
             let http_port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
             let addr: SocketAddr = format!("0.0.0.0:{http_port}").parse().unwrap();
-            graphql_api::run(addr, schema, webhook_store, stripe_webhook_secret).await;
+            let ws_routes = ws_server::ws_router(feed_for_ws, alert_feed.clone());
+            graphql_api::run(addr, schema, webhook_store, stripe_webhook_secret, ws_routes).await;
         })
     };
 
@@ -215,7 +206,6 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
         _ = market_data_task => tracing::error!("market data task exited"),
         _ = tick_writer_task => tracing::error!("tick writer task exited"),
         _ = alert_checker_task => tracing::error!("alert checker task exited"),
-        _ = ws_server_task => tracing::error!("ws server task exited"),
         _ = graphql_task => tracing::error!("graphql task exited"),
         _ = signal::ctrl_c() => tracing::info!("shutdown signal received"),
         _ = leaderboard_refresh_task => tracing::error!("leaderboard refresh task exited"),

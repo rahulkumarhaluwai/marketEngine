@@ -4,13 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1"
 tokio = { workspace = true }
-tokio-tungstenite = "0.23"
 futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-uuid = {workspace = true}
 tracing = { workspace = true }
+uuid = { workspace = true }
+axum = { version = "0.7", features = ["ws"] }
 common = { path = "../common" }
 market-data = { path = "../market-data" }
