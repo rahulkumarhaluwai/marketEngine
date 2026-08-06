@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "@/app/providers";
 import { gqlClient } from "@/lib/graphql-client";
@@ -13,6 +13,14 @@ const PACKS = [
 ];
 
 export default function DepositPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-white dark:bg-gray-950 p-8" />}>
+      <DepositPageContent />
+    </Suspense>
+  );
+}
+
+function DepositPageContent() {
   const { userId } = useSession();
   const searchParams = useSearchParams();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
