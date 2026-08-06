@@ -21,7 +21,11 @@ pub fn build_schema(context: AppContext) -> AppSchema {
 }
 
 pub async fn run(addr: SocketAddr, schema: AppSchema, store: std::sync::Arc<dyn store::Store>, stripe_webhook_secret: String) {
-    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
+    let frontend_origin = std::env::var("FRONTEND_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let cors = CorsLayer::new()
+    .allow_origin(frontend_origin.parse::<axum::http::HeaderValue>().expect("invalid FRONTEND_ORIGIN"))
+    .allow_methods(Any)
+    .allow_headers(Any);
 
     let app = Router::new()
         .route("/graphql", get(graphiql).post_service(GraphQL::new(schema)))

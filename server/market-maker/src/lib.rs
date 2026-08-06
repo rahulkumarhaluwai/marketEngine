@@ -27,23 +27,15 @@ impl Default for MarketMakerConfig {
         }
     }
 }
-
-/// Creates the bot's account on first run (large starting cash so it
-/// never realistically runs out) and reuses it on subsequent restarts.
 async fn ensure_bot_account(store: &Arc<dyn Store>, username: &str) -> Uuid {
     if let Some(existing) = store.get_account_by_username(username).await {
         return existing.id;
     }
-    // Bots never log in via password — placeholder hash is fine since
-    // verify_password() fails closed (returns false) on a non-hash string.
     let account = store.create_account(username.to_string(), "bot".to_string()).await;
     store.deposit(account.id, Decimal::from(10_000_000)).await;
     account.id
 }
 
-/// Spawns one market-maker task per symbol. Periodically places resting
-/// limit orders on both sides of the reference price to keep the book
-/// populated, so the order book isn't empty when there's only one real user.
 pub fn spawn(
     symbol: Symbol,
     store: Arc<dyn Store>,

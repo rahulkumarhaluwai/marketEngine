@@ -5,8 +5,6 @@ use rust_decimal::Decimal;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
-/// Result of submitting an order: any trades executed immediately,
-/// plus the resulting status of the submitted order.
 #[derive(Debug, Clone)]
 pub struct MatchResult {
     pub trades: Vec<Trade>,
@@ -60,9 +58,6 @@ impl EngineHandle {
     }
 }
 
-/// Spawns one matching-engine actor task per symbol. Each owns its
-/// OrderBook exclusively — no locking needed, commands are serialized
-/// through the mpsc channel.
 pub fn spawn(symbol: Symbol) -> EngineHandle {
     let (tx, mut rx) = mpsc::channel::<EngineCommand>(1024);
     let mut book = OrderBook::new(symbol);
@@ -95,10 +90,6 @@ fn opposite_side(side: Side) -> Side {
     }
 }
 
-/// Core matching logic: crosses the incoming order against the
-/// opposite side of the book at price-time priority until either
-/// the order is fully filled or no more crossable liquidity remains.
-/// Any remainder of a limit order rests on the book.
 fn match_order(book: &mut OrderBook, mut order: Order) -> MatchResult {
     let mut trades = Vec::new();
     let contra_side = opposite_side(order.side);
@@ -114,8 +105,6 @@ fn match_order(book: &mut OrderBook, mut order: Order) -> MatchResult {
             Some((p, o)) => (p, o.clone()),
             None => break,
         };
-
-        // Check crossability
         let crosses = match order.order_type {
             OrderType::Market => true,
             OrderType::Limit => match order.side {
@@ -140,7 +129,7 @@ fn match_order(book: &mut OrderBook, mut order: Order) -> MatchResult {
             symbol: order.symbol,
             buy_order_id,
             sell_order_id,
-            price: best_price, // resting order's price — standard price-time priority rule
+            price: best_price,
             quantity: fill_qty,
             executed_at: Utc::now(),
         });
@@ -149,8 +138,6 @@ fn match_order(book: &mut OrderBook, mut order: Order) -> MatchResult {
         remaining -= fill_qty;
         order.filled_quantity += fill_qty;
     }
-
-    // Rest any remainder of a limit order on the book.
     if remaining > Decimal::ZERO && order.order_type == OrderType::Limit {
         if let Some(price) = order.price {
             book.insert(
@@ -170,7 +157,7 @@ fn match_order(book: &mut OrderBook, mut order: Order) -> MatchResult {
     } else if order.filled_quantity > Decimal::ZERO {
         OrderStatus::PartiallyFilled
     } else if order.order_type == OrderType::Market {
-        OrderStatus::Cancelled // market order with zero fill has no book presence
+        OrderStatus::Cancelled
     } else {
         OrderStatus::Open
     };

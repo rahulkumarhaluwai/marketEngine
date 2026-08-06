@@ -43,9 +43,6 @@ pub async fn run(feed: MarketDataFeed) {
             let mut price = starting_price(symbol);
 
             loop {
-                // ThreadRng is !Send — created and dropped inside this
-                // block, entirely before the .await below, so the
-                // outer future stays Send.
                 let (direction, magnitude) = {
                     let mut rng = rand::thread_rng();
                     let direction: i32 = rng.gen_range(-1..=1);
@@ -55,7 +52,7 @@ pub async fn run(feed: MarketDataFeed) {
 
                 let tick_size = match symbol {
                     Symbol::BtcUsd | Symbol::EthUsd => Decimal::from_str("0.01").unwrap(),
-                    _ => Decimal::from_str("0.005").unwrap(), // smaller steps for stocks
+                    _ => Decimal::from_str("0.005").unwrap(),
                 };
 
                 let step = tick_size * Decimal::from(direction) * Decimal::from(magnitude);

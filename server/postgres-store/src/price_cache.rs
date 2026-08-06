@@ -3,8 +3,6 @@ use redis::AsyncCommands;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
-/// Redis-backed cache for the latest price per symbol. Read on every
-/// order placement (risk checks) instead of querying market_ticks.
 #[derive(Clone)]
 pub struct PriceCache {
     client: redis::Client,
@@ -18,14 +16,14 @@ impl PriceCache {
 
     pub async fn set_price(&self, symbol: Symbol, price: Decimal) -> anyhow::Result<()> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let key = format!("price:{}", symbol.as_str());
+        let key = format!("marketengine:price:{}", symbol.as_str());
         let _: () = conn.set(key, price.to_string()).await?;
         Ok(())
     }
 
     pub async fn get_price(&self, symbol: Symbol) -> anyhow::Result<Option<Decimal>> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let key = format!("price:{}", symbol.as_str());
+        let key = format!("marketengine:price:{}", symbol.as_str());
         let raw: Option<String> = conn.get(key).await?;
         Ok(raw.and_then(|s| Decimal::from_str(&s).ok()))
     }

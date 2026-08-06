@@ -13,16 +13,11 @@ pub enum RiskError {
     ExceedsOpenOrderLimit,
 }
 
-/// Per-user account snapshot needed to evaluate risk. In production
-/// this is loaded from the account/portfolio store before each check.
 #[derive(Debug, Clone)]
 pub struct AccountSnapshot {
     pub cash_balance: Decimal,
-    /// symbol -> quantity held
     pub holdings: HashMap<String, Decimal>,
-    /// cash currently reserved by open buy orders
     pub reserved_cash: Decimal,
-    /// asset qty currently reserved by open sell orders
     pub reserved_assets: HashMap<String, Decimal>,
     pub open_order_count: usize,
 }
@@ -35,7 +30,7 @@ pub struct RiskConfig {
 impl Default for RiskConfig {
     fn default() -> Self {
         Self {
-            max_order_notional: Decimal::new(1_000_000, 0), // $1,000,000
+            max_order_notional: Decimal::new(1_000_000, 0),
             max_open_orders_per_user: 50,
         }
     }
@@ -50,9 +45,6 @@ impl RiskEngine {
         Self { config }
     }
 
-    /// Validates an order against the user's account snapshot.
-    /// `reference_price` is the current market price, used to estimate
-    /// notional for market orders (which have no explicit price).
     pub fn validate(
         &self,
         order: &Order,
@@ -111,8 +103,6 @@ impl RiskEngine {
     }
 }
 
-/// Helper used by the API layer to reserve funds/assets once an order
-/// passes validation and before it's submitted to the matching engine.
 pub fn reserve_for_order(order: &Order, reference_price: Decimal) -> Reservation {
     match order.side {
         Side::Buy => {

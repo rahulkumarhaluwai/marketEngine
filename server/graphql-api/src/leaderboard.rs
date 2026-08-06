@@ -1,7 +1,7 @@
 use redis::AsyncCommands;
 use uuid::Uuid;
 
-const LEADERBOARD_KEY: &str = "leaderboard:equity";
+const LEADERBOARD_KEY: &str = "marketengine:leaderboard:equity";
 
 #[derive(Clone)]
 pub struct Leaderboard {

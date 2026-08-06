@@ -15,7 +15,6 @@ use graphql_api::store::Store;
 use graphql_api::store::CandleSource;
 use graphql_api::leaderboard::Leaderboard;
 use graphql_api::rate_limiter::RateLimiter;
-use std::str::FromStr as _;
 
 #[tokio::main]
 async fn main() {
@@ -30,15 +29,18 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
     let alert_feed = AlertFeed::new(256);
     let reference_prices = Arc::new(tokio::sync::RwLock::new(HashMap::<Symbol, Decimal>::new()));
 
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+    let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL not set");
+
     let store = Arc::new(
-        PostgresStore::connect("postgres://postgres:postgres@localhost/trading")
-            .await
-            .expect("connect to Postgres"),
+    PostgresStore::connect(&database_url)
+        .await
+        .expect("connect to Postgres"),
     );
-    let price_cache = PriceCache::new("redis://127.0.0.1/").expect("connect to Redis (price cache)");
-    let sessions = SessionStore::new("redis://127.0.0.1/").expect("connect to Redis (sessions)");
-    let leaderboard = Leaderboard::new("redis://127.0.0.1/").expect("connect to Redis (leaderboard)");
-    let rate_limiter = RateLimiter::new("redis://127.0.0.1/").expect("connect to Redis (rate limiter)");
+    let price_cache = PriceCache::new(&redis_url).expect("connect to Redis (price cache)");
+    let sessions = SessionStore::new(&redis_url).expect("connect to Redis (sessions)");
+    let leaderboard = Leaderboard::new(&redis_url).expect("connect to Redis (leaderboard)");
+    let rate_limiter = RateLimiter::new(&redis_url).expect("connect to Redis (rate limiter)");
 
     let mut engines: HashMap<Symbol, EngineHandle> = HashMap::new();
     engines.insert(Symbol::BtcUsd, matching_engine::spawn(Symbol::BtcUsd));
@@ -175,7 +177,8 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
         let alert_feed = alert_feed.clone();
         tokio::spawn(async move {
             tracing::info!("websocket server starting");
-            let addr: SocketAddr = "0.0.0.0:9001".parse().unwrap();
+            let ws_port = std::env::var("WS_PORT").unwrap_or_else(|_| "9001".to_string());
+            let addr: SocketAddr = format!("0.0.0.0:{ws_port}").parse().unwrap();
             ws_server::run(addr, feed, alert_feed).await;
         })
     };
@@ -202,7 +205,8 @@ let app_base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://loca
                 app_base_url: app_base_url.clone(),
             };
             let schema = graphql_api::build_schema(context);
-            let addr: SocketAddr = "0.0.0.0:8000".parse().unwrap();
+            let http_port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+            let addr: SocketAddr = format!("0.0.0.0:{http_port}").parse().unwrap();
             graphql_api::run(addr, schema, webhook_store, stripe_webhook_secret).await;
         })
     };

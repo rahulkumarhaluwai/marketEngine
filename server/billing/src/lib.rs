@@ -56,8 +56,6 @@ pub async fn create_checkout_session(
     body["url"].as_str().map(|s| s.to_string()).ok_or_else(|| anyhow::anyhow!("no checkout url in stripe response"))
 }
 
-/// Verifies Stripe's webhook signature per their documented HMAC scheme.
-/// Header format: "t=<timestamp>,v1=<signature>[,v0=...]"
 pub fn verify_webhook_signature(payload: &[u8], sig_header: &str, webhook_secret: &str) -> bool {
     let mut timestamp = None;
     let mut v1_sig = None;
