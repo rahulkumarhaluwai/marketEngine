@@ -14,7 +14,7 @@ export type AlertRecord = {
 
 type CreateAlertInput = {
   userId: string;
-  symbol: "BTC_USD" | "ETH_USD";
+  symbol: string;
   targetPrice: string;
   direction: "ABOVE" | "BELOW";
 };

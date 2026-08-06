@@ -6,7 +6,7 @@ import { PLACE_ORDER } from "./queries";
 
 type OrderInput = {
   userId: string;
-  symbol: "BTC_USD" | "ETH_USD";
+  symbol: string;
   side: "BUY" | "SELL";
   orderType: "MARKET" | "LIMIT";
   quantity: string;
