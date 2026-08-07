@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/app/providers";
 import { ThemeToggle } from "./ThemeToggle";
-import { Avatar } from "./Avatar";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -48,7 +47,6 @@ export function NavBar() {
           <ThemeToggle />
           {userId && username ? (
             <>
-              <Avatar username={username} size="sm" />
               <span className="text-sm text-gray-600 dark:text-gray-300">{username}</span>
               <button onClick={clearUserId} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                 Log out
