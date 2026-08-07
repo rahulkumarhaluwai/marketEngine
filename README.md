@@ -1,4 +1,4 @@
-# TradeSim — Real-Time Simulated Trading Platform
+# marketEngine — Real-Time Simulated Trading Platform
 
 A fully self-contained, simulated stock and crypto trading platform built to demonstrate real-time systems, concurrent order matching, and full-stack engineering. No real money, no real brokers — everything is simulated end-to-end.
 
