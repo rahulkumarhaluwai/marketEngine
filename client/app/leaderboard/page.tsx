@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { gqlClient } from "@/lib/graphql-client";
 import { GET_LEADERBOARD } from "@/lib/queries";
-import { Avatar } from "@/components/Avatar";
 
 type Entry = { rank: number; username: string; equity: string };
 
@@ -41,7 +40,6 @@ export default function LeaderboardPage() {
                 <td className="py-2 font-mono">#{e.rank}</td>
                 <td className="py-2">
                   <div className="flex items-center gap-2">
-                    <Avatar username={e.username} size="sm" />
                     {e.username}
                   </div>
                 </td>
