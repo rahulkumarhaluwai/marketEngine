@@ -19,34 +19,8 @@ A fully self-contained, simulated stock and crypto trading platform built to dem
 - **Rate limiting** — Redis-backed limits on order placement and login attempts
 - **Candlestick charts** — live OHLC charts per asset, built from persisted tick data
 - **Dark/light theme** — persisted, system-wide toggle
-- **Generated avatars** — deterministic, derived from username, zero storage
 
 ---
-
-## Architecture
-
-```
-                        ┌─────────────────────┐
-                        │   Next.js Frontend   │
-                        │   (Vercel)           │
-                        └──────────┬───────────┘
-                                   │ GraphQL + WebSocket
-                        ┌──────────▼───────────┐
-                        │   Rust Backend        │
-                        │   (Render, Axum)      │
-                        │                       │
-   ┌─────────────┐      │  ┌─────────────────┐  │      ┌──────────────┐
-   │ Market Data │◄─────┼─►│ Matching Engine │  │      │   Postgres   │
-   │  Generator  │      │  │ (actor/symbol)  │  │◄────►│    (Neon)    │
-   └─────────────┘      │  └─────────────────┘  │      └──────────────┘
-                        │  ┌─────────────────┐  │
-                        │  │  Risk Engine    │  │      ┌──────────────┐
-                        │  └─────────────────┘  │◄────►│    Redis     │
-                        │  ┌─────────────────┐  │      │ (Redis Cloud)│
-                        │  │  GraphQL API    │  │      └──────────────┘
-                        │  └─────────────────┘  │
-                        └───────────────────────┘
-```
 
 ## Tech Stack
 
